@@ -1995,8 +1995,22 @@ class ProfileAdapter(
         // a single group-type chip (URL-TEST / FALLBACK / …) so groups read distinctly
         // from nodes. Both resolve offline (overlay: type from transport/groups preview).
         val groupTypeLabel = groupTypeLabel(p.type)
+        val isOlcBridge = p.name == "OLCWave" && displayGroupName(groupName) == "OlcLash"
         val showBadge: Boolean
-        if (p.type.group) {
+        if (isOlcBridge) {
+            applyProtoChip(
+                typeBadge,
+                context.getString(R.string.olc_transport_badge),
+                ContextCompat.getColor(context, R.color.proto_vless),
+            )
+            applyProtoChip(
+                transportBadge,
+                context.getString(R.string.olc_carrier_badge),
+                ContextCompat.getColor(context, R.color.proto_transport),
+            )
+            realityBadge.visibility = View.GONE
+            showBadge = true
+        } else if (p.type.group) {
             if (groupTypeLabel != null) {
                 applyProtoChip(typeBadge, groupTypeLabel, ContextCompat.getColor(context, groupTypeColor(p.type)))
             } else {
@@ -2027,8 +2041,11 @@ class ProfileAdapter(
             }
         }
 
-        val rawSubtitle = p.subtitle
-            .takeIf { it.isNotBlank() && !it.equals(typeName, ignoreCase = true) }
+        val rawSubtitle = if (isOlcBridge) {
+            context.getString(R.string.olc_server_routing)
+        } else {
+            p.subtitle.takeIf { it.isNotBlank() && !it.equals(typeName, ignoreCase = true) }
+        }
         val subtitle = buildList {
             rawSubtitle?.let(::add)
             if (showGroupInSubtitle) add(displayGroupName(groupName))
