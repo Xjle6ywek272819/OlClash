@@ -77,7 +77,7 @@ class StaticNotificationModule(service: Service) : Module<Unit>(service) {
         fun notifyLoadingNotification(service: Service) {
             val notification =
                 NotificationCompat.Builder(service, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_logo_service)
+                    .setSmallIcon(R.drawable.ic_olclash_service)
                     .setOngoing(true)
                     .setColor(service.getColorCompat(R.color.color_clash))
                     .setOnlyAlertOnce(true)
