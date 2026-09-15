@@ -1183,4 +1183,7 @@
     <string name="latency_target_invalid">请输入网站，例如 example.com</string>
     <string name="latency_target_run">测试</string>
     <string name="latency_target_nothing_to_test">该分组没有可测试的节点</string>
+    <string name="olc_transport_badge">OLC·RTC</string>
+    <string name="olc_carrier_badge">VP8/KCP</string>
+    <string name="olc_server_routing">服务器端路由</string>
 </resources>
