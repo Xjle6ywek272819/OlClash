@@ -70,6 +70,9 @@ jobs:
       - name: Populate embedded Root CA bundle
         run: bash .github/scripts/populate-ca-bundle.sh
 
+      - name: Fetch pinned olcRTC Android runtime
+        run: bash .github/scripts/fetch-olcrtc-android.sh
+
       - name: Build Alpha Debug APK
         run: ./gradlew assembleAlphaDebug
 
