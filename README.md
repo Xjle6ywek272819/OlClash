@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/branding/olclash-icon-concept.png" width="180" alt="OlcLash icon" />
+  <img src="design/branding/olclash-icon-readme.png" width="180" alt="OlcLash icon" />
 </p>
 
 <h1 align="center">OlcLash</h1>
