@@ -124,7 +124,7 @@ class ClashNotificationPresenter(private val service: Service) {
     /** Fresh builder carrying all static chrome; the caller sets the text fields. */
     fun newBuilder(): NotificationCompat.Builder {
         val builder = NotificationCompat.Builder(service, StaticNotificationModule.CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_logo_service)
+            .setSmallIcon(R.drawable.ic_olclash_service)
             .setOngoing(true)
             .setColor(accentColor ?: service.getColorCompat(R.color.color_clash))
             .setOnlyAlertOnce(true)
