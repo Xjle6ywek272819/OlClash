@@ -163,7 +163,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             }
 
             // Route
-            if (store.bypassPrivateNetwork) {
+            if (store.bypassPrivateNetwork && !olcMode) {
                 resources.getStringArray(R.array.bypass_private_route).map(::parseCIDR).forEach {
                     addRoute(it.ip, it.prefix)
                 }
@@ -191,6 +191,12 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                 // Excluding our own UID prevents the olcRTC carrier sockets from looping
                 // back into Mihomo. The saved Remnawave per-app mode/list is untouched.
                 runCatching { addDisallowedApplication(packageName) }
+                    .onSuccess {
+                        Log.i("TunService: OLC mode, all applications captured; carrier UID excluded")
+                    }
+                    .onFailure {
+                        Log.e("TunService: failed to exclude OLC carrier UID", it)
+                    }
             } else {
                 when (store.accessControlMode) {
                     AccessControlMode.AcceptAll -> Unit
@@ -211,7 +217,10 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             setBlocking(false)
 
             // Mtu
-            setMtu(TUN_MTU)
+            // olcbox uses a conventional mobile-network MTU. Advertising a jumbo MTU here can
+            // make applications hand the userspace stack packets larger than the WebRTC/KCP path
+            // can carry reliably even though Mihomo's small delay-test request still succeeds.
+            setMtu(if (olcMode) OLC_TUN_MTU else TUN_MTU)
 
             // Session name shown in system VPN UI (not related to traffic encryption).
             setSession(getString(R.string.vpn_session_name))
@@ -250,7 +259,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                 }
             }
 
-            if (store.allowBypass) {
+            if (store.allowBypass && !olcMode) {
                 allowBypass()
             }
 
@@ -283,6 +292,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
     companion object {
         private const val TUN_MTU = 9000
+        private const val OLC_TUN_MTU = 1500
         private const val TUN_SUBNET_PREFIX = 30
         private const val TUN_GATEWAY = "172.19.0.1"
         private const val TUN_SUBNET_PREFIX6 = 126
