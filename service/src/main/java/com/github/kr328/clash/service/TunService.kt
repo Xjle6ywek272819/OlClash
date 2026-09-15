@@ -268,7 +268,11 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
                     ?: throw NullPointerException("Establish VPN rejected by system"),
                 // Operator `X-Network-Stack` header locks the stack; else the user's app setting; else
                 // (Auto) the subscription's tun.stack; else the `system` default. See TunStackResolver.
-                stack = TunStackResolver.resolve(
+                // The upstream olcbox path uses hev-socks5-tunnel, i.e. a userspace TCP/IP stack.
+                // Mihomo's system stack is not an equivalent TUN-to-loopback-SOCKS adapter on
+                // Android: the VPN is established but application flows never reach olcRTC.
+                // Keep the user's selected stack untouched for normal Remnawave profiles.
+                stack = if (olcMode) "gvisor" else TunStackResolver.resolve(
                     store.tunStackMode,
                     store.activeProfile?.let { store.subscriptionNetworkStackFor(it) },
                     readActiveProfileConfigYaml(),
