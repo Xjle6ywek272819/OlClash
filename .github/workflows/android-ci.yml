@@ -2,12 +2,26 @@ name: Android CI
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'NOTICE'
+      - 'LICENSE'
+      - 'docs/**'
+      - 'licenses/**'
+      - 'design/branding/**'
   push:
     branches:
       - dev
       - main
       - master
       - 'feat/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'NOTICE'
+      - 'LICENSE'
+      - 'docs/**'
+      - 'licenses/**'
+      - 'design/branding/**'
   workflow_dispatch:
 
 permissions:
