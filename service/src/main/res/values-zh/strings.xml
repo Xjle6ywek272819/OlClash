@@ -18,6 +18,7 @@
     <string name="profile_service_status">配置文件服务状态</string>
     <string name="profile_process_result">配置文件处理结果</string>
     <string name="vpn_session_name" translatable="true">OlcLash</string>
+    <string name="olc_transport_starting">正在启动 OLC 传输</string>
 
     <string name="update_failed_expired_title">订阅已过期</string>
     <string name="update_failed_expired_body">已于 %1$s 到期。请续费后重新更新配置。</string>

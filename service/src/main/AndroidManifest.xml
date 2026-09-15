@@ -34,6 +34,14 @@
             </intent-filter>
         </service>
         <service
+            android:name=".OlcTransportService"
+            android:exported="false"
+            android:process=":olcrtc"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="olcRTC carrier transport for the active VPN profile"/>
+        </service>
+        <service
             android:name=".RemoteService"
             android:exported="false"
             android:process=":background" />

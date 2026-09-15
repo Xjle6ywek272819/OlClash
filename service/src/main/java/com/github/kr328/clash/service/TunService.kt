@@ -7,6 +7,7 @@ import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import com.github.kr328.clash.common.compat.pendingIntentFlags
+import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.common.constants.Components
 import com.github.kr328.clash.common.log.Log
 import com.github.kr328.clash.service.clash.clashRuntime
@@ -18,6 +19,7 @@ import com.github.kr328.clash.service.util.importedDir
 import com.github.kr328.clash.service.util.cancelAndJoinBlocking
 import com.github.kr328.clash.service.util.parseCIDR
 import com.github.kr328.clash.service.util.ProxyPropertyGuard
+import com.github.kr328.clash.service.util.OlcProfile
 import com.github.kr328.clash.service.util.sendClashStarted
 import com.github.kr328.clash.service.util.sendClashStopped
 import kotlinx.coroutines.*
@@ -128,6 +130,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
     override fun onDestroy() {
         TunModule.requestStop()
+        stopService(OlcTransportService::class.intent)
 
         StatusProvider.serviceRunning = false
 
@@ -148,6 +151,9 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
     private fun TunModule.open() {
         val store = ServiceStore(self)
+        val olcMode = store.activeProfile
+            ?.let { OlcProfile.isOlc(importedDir.resolve(it.toString())) }
+            ?: false
 
         val device = with(Builder()) {
             // Interface address
@@ -180,16 +186,23 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             }
 
             // Access Control
-            when (store.accessControlMode) {
-                AccessControlMode.AcceptAll -> Unit
-                AccessControlMode.AcceptSelected -> {
-                    (store.accessControlPackages + packageName).forEach {
-                        runCatching { addAllowedApplication(it) }
+            if (olcMode) {
+                // Server-side OLC routing needs every user application in the tunnel.
+                // Excluding our own UID prevents the olcRTC carrier sockets from looping
+                // back into Mihomo. The saved Remnawave per-app mode/list is untouched.
+                runCatching { addDisallowedApplication(packageName) }
+            } else {
+                when (store.accessControlMode) {
+                    AccessControlMode.AcceptAll -> Unit
+                    AccessControlMode.AcceptSelected -> {
+                        (store.accessControlPackages + packageName).forEach {
+                            runCatching { addAllowedApplication(it) }
+                        }
                     }
-                }
-                AccessControlMode.DenySelected -> {
-                    (store.accessControlPackages - packageName).forEach {
-                        runCatching { addDisallowedApplication(it) }
+                    AccessControlMode.DenySelected -> {
+                        (store.accessControlPackages - packageName).forEach {
+                            runCatching { addDisallowedApplication(it) }
+                        }
                     }
                 }
             }
