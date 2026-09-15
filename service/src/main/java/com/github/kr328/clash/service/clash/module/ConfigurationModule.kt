@@ -5,12 +5,16 @@ import com.github.kr328.clash.common.constants.Intents
 import com.github.kr328.clash.common.log.Log
 import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.service.StatusProvider
+import com.github.kr328.clash.service.OlcTransportService
+import com.github.kr328.clash.common.compat.startForegroundServiceCompat
+import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.service.data.ImportedDao
 import com.github.kr328.clash.service.data.SelectionDao
 import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.GeoUrlSanitizer
 import com.github.kr328.clash.service.util.ConfigScriptPolicy
 import com.github.kr328.clash.service.util.ProfileOverlay
+import com.github.kr328.clash.service.util.OlcProfile
 import com.github.kr328.clash.service.util.ProxyDialerYamlEdit
 import com.github.kr328.clash.service.util.ProxyGroupsYamlEdit
 import com.github.kr328.clash.service.util.ProxyHardener
@@ -113,6 +117,13 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                     ?: throw NullPointerException("No profile selected")
 
                 val profileDir = service.importedDir.resolve(active.uuid.toString())
+                if (OlcProfile.isOlc(profileDir)) {
+                    service.startForegroundServiceCompat(
+                        OlcTransportService::class.intent.setAction(OlcTransportService.ACTION_START)
+                    )
+                } else {
+                    service.stopService(OlcTransportService::class.intent)
+                }
 
                 // age: config.yaml is normally already decrypted at fetch time, but a
                 // File-type profile imported as an age armor (or a pre-decrypt legacy
@@ -159,6 +170,12 @@ class ConfigurationModule(service: Service) : Module<ConfigurationModule.LoadExc
                 // never load something worse than before.
                 runCatching {
                     val configFile = java.io.File(profileDir, "config.yaml")
+                    if (OlcProfile.isOlc(profileDir)) {
+                        // OLC routing is authoritative on the server. Keep Mihomo as a
+                        // deterministic TUN-to-SOCKS frontend and ignore local rule overlays.
+                        configFile.writeText(OlcProfile.frontendYaml())
+                        return@runCatching
+                    }
                     val backup = configFile.takeIf { it.isFile }?.readText()
                     ProfileOverlay.refreshFromStore(
                         profileDir, active.uuid, service.importedDir, store,

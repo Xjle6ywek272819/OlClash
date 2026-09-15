@@ -15,6 +15,7 @@ import com.github.kr328.clash.service.store.ServiceStore
 import com.github.kr328.clash.service.util.FetchHeadersFile
 import com.github.kr328.clash.service.util.GeoUrlSanitizer
 import com.github.kr328.clash.service.util.MihomoConfigDocument
+import com.github.kr328.clash.service.util.OlcProfile
 import com.github.kr328.clash.service.util.RuleApplyService
 import com.github.kr328.clash.service.util.RuleMapper
 import com.github.kr328.clash.service.util.FetchErrorClassifier
@@ -68,6 +69,7 @@ object ProfileProcessor {
 
                 val force = snapshot.type != Profile.Type.File
                 var cb = callback
+                context.processingDir.resolve(OlcProfile.SUBSCRIPTION_FILE).delete()
 
                 val userAgentOverride = SubscriptionOverrides.getUserAgent(context, snapshot.uuid)
                 val strictUserAgent = SubscriptionOverrides.isStrictUserAgent(context, snapshot.uuid)
@@ -92,25 +94,33 @@ object ProfileProcessor {
                         }
                     }.await()
                 } catch (e: Exception) {
-                    if (userAgentOverride.isNullOrBlank() || strictUserAgent) {
+                    if (recoverOlcWaveDownload(context.processingDir)) {
+                        Log.i("Imported olcWave subscription as an OlcLash frontend profile")
+                    } else if (userAgentOverride.isNullOrBlank() || strictUserAgent) {
                         throw FetchErrorClassifier.clarify(context.processingDir, e)
-                    }
-
-                    Log.w("Subscription fetch failed with custom User-Agent, retrying default core User-Agent", e)
-                    Clash.fetchAndValid(
-                        context.processingDir,
-                        snapshot.source,
-                        force,
-                        ServiceStore(context).subscriptionUpdateViaProxy(snapshot.uuid),
-                        SubscriptionRequestHeaders.toNativeFetchJson(context, null),
-                    ) {
+                    } else {
+                        Log.w("Subscription fetch failed with custom User-Agent, retrying default core User-Agent", e)
                         try {
-                            cb?.updateStatus(it)
-                        } catch (e2: Exception) {
-                            cb = null
-                            Log.w("Report fetch status callback failed", e2)
+                            Clash.fetchAndValid(
+                                context.processingDir,
+                                snapshot.source,
+                                force,
+                                ServiceStore(context).subscriptionUpdateViaProxy(snapshot.uuid),
+                                SubscriptionRequestHeaders.toNativeFetchJson(context, null),
+                            ) {
+                                try {
+                                    cb?.updateStatus(it)
+                                } catch (e2: Exception) {
+                                    cb = null
+                                    Log.w("Report fetch status callback failed", e2)
+                                }
+                            }.await()
+                        } catch (retryError: Exception) {
+                            if (!recoverOlcWaveDownload(context.processingDir)) {
+                                throw FetchErrorClassifier.clarify(context.processingDir, retryError)
+                            }
                         }
-                    }.await()
+                    }
                 }
 
                 GeoUrlSanitizer.sanitizeProfile(context.processingDir)
@@ -259,6 +269,7 @@ object ProfileProcessor {
                 }
 
                 var cb = callback
+                context.processingDir.resolve(OlcProfile.SUBSCRIPTION_FILE).delete()
 
                 val userAgentOverride = SubscriptionOverrides.getUserAgent(context, snapshot.uuid)
                 val strictUserAgent = SubscriptionOverrides.isStrictUserAgent(context, snapshot.uuid)
@@ -282,26 +293,34 @@ object ProfileProcessor {
                         }
                     }.await()
                 } catch (e: Exception) {
-                    if (userAgentOverride.isNullOrBlank() || strictUserAgent) {
+                    if (recoverOlcWaveDownload(context.processingDir)) {
+                        Log.i("Updated olcWave subscription frontend profile")
+                    } else if (userAgentOverride.isNullOrBlank() || strictUserAgent) {
                         throw FetchErrorClassifier.clarify(context.processingDir, e)
-                    }
-
-                    Log.w("Subscription update failed with custom User-Agent, retrying default core User-Agent", e)
-                    Clash.fetchAndValid(
-                        context.processingDir,
-                        snapshot.source,
-                        true,
-                        ServiceStore(context).subscriptionUpdateViaProxy(snapshot.uuid),
-                        SubscriptionRequestHeaders.toNativeFetchJson(context, null),
-                    ) {
+                    } else {
+                        Log.w("Subscription update failed with custom User-Agent, retrying default core User-Agent", e)
                         try {
-                            cb?.updateStatus(it)
-                        } catch (e2: Exception) {
-                            cb = null
-                            Log.w("Report fetch status callback failed", e2)
+                            Clash.fetchAndValid(
+                                context.processingDir,
+                                snapshot.source,
+                                true,
+                                ServiceStore(context).subscriptionUpdateViaProxy(snapshot.uuid),
+                                SubscriptionRequestHeaders.toNativeFetchJson(context, null),
+                            ) {
+                                try {
+                                    cb?.updateStatus(it)
+                                } catch (e2: Exception) {
+                                    cb = null
+                                    Log.w("Report fetch status callback failed", e2)
+                                }
+                            }.await()
+                            effectiveUserAgentOverride = null
+                        } catch (retryError: Exception) {
+                            if (!recoverOlcWaveDownload(context.processingDir)) {
+                                throw FetchErrorClassifier.clarify(context.processingDir, retryError)
+                            }
                         }
-                    }.await()
-                    effectiveUserAgentOverride = null
+                    }
                 }
 
                 // Clear any stale warnings from a previous update; set below only
@@ -466,5 +485,11 @@ object ProfileProcessor {
             interval != 0L && TimeUnit.MILLISECONDS.toMinutes(interval) < 15 ->
                 throw IllegalArgumentException("Invalid interval")
         }
+    }
+
+    private suspend fun recoverOlcWaveDownload(profileDir: File): Boolean {
+        if (!OlcProfile.convertDownloadedBody(profileDir)) return false
+        Clash.validateProfile(profileDir).await()
+        return true
     }
 }
