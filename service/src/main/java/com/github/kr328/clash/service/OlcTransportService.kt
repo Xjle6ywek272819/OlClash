@@ -1,5 +1,6 @@
 package com.github.kr328.clash.service
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -121,6 +122,15 @@ class OlcTransportService : Service() {
             next.start()
             next.waitReady(READY_TIMEOUT_MS)
             Log.i("olcRTC ready on 127.0.0.1:${OlcProfile.SOCKS_PORT}")
+            val notification = NotificationCompat.Builder(this, StaticNotificationModule.CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_logo_service)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setShowWhen(false)
+                .setContentTitle(getString(R.string.running))
+                .build()
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
             Log.e("olcRTC transport failed", e)
             // A stale waitReady() may finish after a newer Runtime has already replaced it.

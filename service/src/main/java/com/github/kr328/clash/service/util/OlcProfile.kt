@@ -45,7 +45,7 @@ object OlcProfile {
             type: socks5
             server: 127.0.0.1
             port: $SOCKS_PORT
-            udp: false
+            udp: true
         proxy-groups:
           - name: OlcLash
             type: select
