@@ -80,4 +80,5 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: olclash-alpha-arm64-apk
-          path: app/build/outputs/apk/**/*.apk
+          path: app/build/outputs/apk/**/*arm64-v8a*.apk
+          if-no-files-found: error

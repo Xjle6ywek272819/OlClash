@@ -2,6 +2,9 @@ package com.github.kr328.clash.service
 
 import android.app.Service
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.github.kr328.clash.common.compat.startForegroundCompat
@@ -27,6 +30,9 @@ class OlcTransportService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var startJob: Job? = null
     @Volatile private var runtime: mobile.Runtime? = null
+    private val connectivityManager by lazy {
+        getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -65,6 +71,16 @@ class OlcTransportService : Service() {
             }
 
         stopTransport()
+        val upstream = findUpstreamNetwork()
+        if (upstream == null) {
+            Log.e("olcRTC transport failed: no non-VPN upstream network")
+            return stopSelf()
+        }
+        if (!connectivityManager.bindProcessToNetwork(upstream)) {
+            Log.e("olcRTC transport failed: could not bind transport process to upstream network")
+            return stopSelf()
+        }
+
         val next = Mobile.new_()
         runtime = next
         next.setProtector(object : SocketProtector {
@@ -73,7 +89,7 @@ class OlcTransportService : Service() {
         })
         next.setLogWriter(object : LogWriter {
             override fun writeLog(msg: String) {
-                msg.lineSequence().filter { it.isNotBlank() }.forEach { Log.i("olcRTC: $it") }
+                msg.lineSequence().filter { it.isNotBlank() }.forEach { Log.w("olcRTC: $it") }
             }
         })
         next.setProvider(endpoint.provider)
@@ -110,6 +126,24 @@ class OlcTransportService : Service() {
     private fun stopTransport() {
         runtime?.let { active -> runCatching { active.stop(STOP_TIMEOUT_MS) } }
         runtime = null
+        runCatching { connectivityManager.bindProcessToNetwork(null) }
+    }
+
+    private fun findUpstreamNetwork(): Network? {
+        val active = connectivityManager.activeNetwork
+        return connectivityManager.allNetworks
+            .mapNotNull { network ->
+                val capabilities = connectivityManager.getNetworkCapabilities(network)
+                    ?: return@mapNotNull null
+                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                    !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                ) return@mapNotNull null
+                val score = (if (network == active) 2 else 0) +
+                    (if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) 1 else 0)
+                network to score
+            }
+            .maxByOrNull { it.second }
+            ?.first
     }
 
     override fun onDestroy() {
@@ -125,7 +159,7 @@ class OlcTransportService : Service() {
         const val ACTION_START = "com.github.kr328.clash.action.START_OLC_TRANSPORT"
         const val ACTION_STOP = "com.github.kr328.clash.action.STOP_OLC_TRANSPORT"
         private const val NOTIFICATION_ID = 2227
-        private const val READY_TIMEOUT_MS = 15_000L
+        private const val READY_TIMEOUT_MS = 60_000L
         private const val STOP_TIMEOUT_MS = 5_000L
     }
 }
