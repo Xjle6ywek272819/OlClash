@@ -45,7 +45,7 @@
     <string name="update_failed_action_retry">Retry</string>
 
     <!-- Shown as VPN session name in Android settings (cosmetic). -->
-    <string name="vpn_session_name" translatable="true">ClashFest</string>
+    <string name="vpn_session_name" translatable="true">OlcLash</string>
 
     <!-- Home-screen speed widget (#101). Kept in :service because the widget RemoteViews are
          built here (direct update from the running VPN service). -->

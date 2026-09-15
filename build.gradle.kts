@@ -57,7 +57,7 @@ subprojects {
         defaultConfig {
             if (isApp) {
                 val customApplicationId = queryConfigProperty("custom.application.id") as? String?
-                applicationId = customApplicationId.takeIf { it?.isNotBlank() == true } ?: "com.nemu.clashfest.clash"
+                applicationId = customApplicationId.takeIf { it?.isNotBlank() == true } ?: "com.vibecode.olclash"
             }
 
             project.name.let { name ->
@@ -90,7 +90,7 @@ subprojects {
             if (!isApp) {
                 consumerProguardFiles("consumer-rules.pro")
             } else {
-                setProperty("archivesBaseName", "clashfest-v$versionName")
+                setProperty("archivesBaseName", "olclash-v$versionName")
             }
         }
 
@@ -109,7 +109,9 @@ subprojects {
         productFlavors {
             flavorDimensions("feature")
 
-            val removeSuffix = (queryConfigProperty("remove.suffix") as? String)?.toBoolean() == true
+            // OlcLash has one stable application identity across engine variants.
+            // Developers can explicitly restore flavor suffixes in local.properties.
+            val removeSuffix = (queryConfigProperty("remove.suffix") as? String)?.toBoolean() ?: true
 
             create("alpha") {
                 isDefault = true
