@@ -1,4 +1,8 @@
-# OlcLash
+<p align="center">
+  <img src="design/branding/olclash-icon-concept.png" width="180" alt="OlcLash icon" />
+</p>
+
+<h1 align="center">OlcLash</h1>
 
 OlcLash is an experimental Android VPN client that supports two different
 subscription and transport families in one application:
