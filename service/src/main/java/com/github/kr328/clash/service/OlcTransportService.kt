@@ -28,8 +28,10 @@ import java.security.SecureRandom
 /** Runs olcRTC outside Mihomo's Go/JNI process and exposes its loopback SOCKS endpoint. */
 class OlcTransportService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val runtimeLock = Any()
     private var startJob: Job? = null
     @Volatile private var runtime: mobile.Runtime? = null
+    @Volatile private var startedProfileId: String? = null
     private val connectivityManager by lazy {
         getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
     }
@@ -54,15 +56,24 @@ class OlcTransportService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startJob?.cancel()
-        startJob = scope.launch { startSelectedProfile() }
+        val profileId = ServiceStore(this).activeProfile?.toString()
+            ?: return START_NOT_STICKY.also { stopSelf() }
+        synchronized(runtimeLock) {
+            // startForegroundService may deliver the same request more than once. JNI waitReady()
+            // is blocking and cannot be cancelled with Job.cancel(), so starting another Runtime
+            // would race for the same loopback SOCKS port and tear down the healthy session.
+            if (startedProfileId == profileId && (startJob?.isActive == true || runtime != null)) {
+                return START_REDELIVER_INTENT
+            }
+            startedProfileId = profileId
+            startJob = scope.launch { startSelectedProfile(profileId) }
+        }
         return START_REDELIVER_INTENT
     }
 
-    private fun startSelectedProfile() {
-        val profile = ServiceStore(this).activeProfile
-            ?.let { importedDir.resolve(it.toString()) }
-            ?.takeIf(OlcProfile::isOlc)
+    private fun startSelectedProfile(profileId: String) {
+        val profile = importedDir.resolve(profileId)
+            .takeIf(OlcProfile::isOlc)
             ?: return stopSelf()
         val endpoint = runCatching { OlcProfile.read(profile).endpoints.first() }
             .getOrElse {
@@ -82,7 +93,10 @@ class OlcTransportService : Service() {
         }
 
         val next = Mobile.new_()
-        runtime = next
+        synchronized(runtimeLock) {
+            runtime = next
+            startedProfileId = profileId
+        }
         next.setProtector(object : SocketProtector {
             // OlcLash's own UID is excluded from the OLC-mode VPN builder.
             override fun protect(fd: Long): Boolean = true
@@ -109,24 +123,39 @@ class OlcTransportService : Service() {
             Log.i("olcRTC ready on 127.0.0.1:${OlcProfile.SOCKS_PORT}")
         } catch (e: Exception) {
             Log.e("olcRTC transport failed", e)
-            stopTransport()
-            stopSelf()
+            // A stale waitReady() may finish after a newer Runtime has already replaced it.
+            // It must never stop the replacement or the service itself.
+            if (stopTransport(next)) stopSelf()
         }
     }
 
     private fun persistentDeviceId(): String {
         val preferences = getSharedPreferences("olcrtc_identity", MODE_PRIVATE)
-        preferences.getString("device_id", null)?.takeIf { it.isNotBlank() }?.let { return it }
+        preferences.getString("device_id", null)?.takeIf { it.isNotBlank() }?.let { stored ->
+            if (stored.startsWith("install-")) return stored
+            return "install-$stored".also {
+                preferences.edit().putString("device_id", it).commit()
+            }
+        }
         val bytes = ByteArray(16).also(SecureRandom()::nextBytes)
-        return bytes.joinToString("") { "%02x".format(it) }.also {
+        return ("install-" + bytes.joinToString("") { "%02x".format(it) }).also {
             preferences.edit().putString("device_id", it).commit()
         }
     }
 
-    private fun stopTransport() {
-        runtime?.let { active -> runCatching { active.stop(STOP_TIMEOUT_MS) } }
-        runtime = null
-        runCatching { connectivityManager.bindProcessToNetwork(null) }
+    private fun stopTransport(expected: mobile.Runtime? = null): Boolean {
+        val active = synchronized(runtimeLock) {
+            if (expected != null && runtime !== expected) return false
+            runtime.also { runtime = null }
+        }
+        active?.let { current -> runCatching { current.stop(STOP_TIMEOUT_MS) } }
+        synchronized(runtimeLock) {
+            if (runtime == null) {
+                startedProfileId = null
+                runCatching { connectivityManager.bindProcessToNetwork(null) }
+            }
+        }
+        return true
     }
 
     private fun findUpstreamNetwork(): Network? {
