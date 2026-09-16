@@ -1,0 +1,67 @@
+name: Sync ClashFest upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: clashfest-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout OlcLash
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          submodules: false
+      - name: Fetch ClashFest
+        run: |
+          git remote add clashfest https://github.com/Nemu-x/ClashFest.git
+          git fetch --no-tags clashfest feat/init-clashfest
+      - name: Check for upstream changes
+        id: changes
+        run: |
+          if git merge-base --is-ancestor clashfest/feat/init-clashfest HEAD; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Merge into review branch
+        if: steps.changes.outputs.needed == 'true'
+        id: merge
+        continue-on-error: true
+        env:
+          BRANCH: sync/clashfest-${{ github.run_id }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git switch -c "$BRANCH"
+          git merge --no-ff --no-edit clashfest/feat/init-clashfest
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Report merge conflicts
+        if: steps.changes.outputs.needed == 'true' && steps.merge.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="ClashFest upstream sync needs manual conflict resolution"
+          body="Automated merge failed. Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Nothing was merged into main."
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then gh issue comment "$existing" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
+          exit 1
+      - name: Open review pull request
+        if: steps.changes.outputs.needed == 'true' && steps.merge.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
+        run: |
+          gh pr create --base main --head "$BRANCH" --title "chore(upstream): sync ClashFest" --body "Automated merge proposal from Nemu-x/ClashFest feat/init-clashfest. This PR is never auto-merged; review transport, routing, branding, permissions, dependencies, and builds."
