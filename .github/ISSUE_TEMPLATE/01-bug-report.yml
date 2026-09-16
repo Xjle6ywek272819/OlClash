@@ -1,54 +1,59 @@
-name: 🐛 Bug report
-description: Report a problem or unexpected behavior
+name: Bug report
+description: Report reproducible OlcLash behavior
 title: "[BUG] "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: "Remove subscription data, credentials, room IDs, HWIDs, device identifiers, and sensitive hostnames from attachments."
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile type
+      options: [Mihomo / Remnawave, OLCWave / olcRTC, Both, Unknown]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OlcLash version
+      placeholder: v1.1.0-alpha.2
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Device model, Android version, ROM
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: What happened?
-      placeholder: Describe the issue...
+      label: What happened?
     validations:
       required: true
-
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
-      placeholder: |
-        1. Open app
-        2. Go to...
-        3. Click...
+      label: Reproduction steps
     validations:
       required: true
-
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
-      placeholder: What should happen?
-
+    validations:
+      required: true
   - type: textarea
-    id: screenshots
+    id: logs
     attributes:
-      label: Screenshots / logs
-      placeholder: Attach screenshots or logs if available
-
-  - type: input
-    id: version
+      label: Redacted logs and screenshots
+      description: Include network type and whether the original client worked on the same network.
+  - type: checkboxes
+    id: safety
     attributes:
-      label: App version
-      placeholder: v0.1.0-alpha
-
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
+      label: Sensitive data check
       options:
-        - UI
-        - Core
-        - Routing
-        - Profiles
-        - Connections
-        - Other
+        - label: I removed subscription data, credentials, room IDs, HWIDs, device IDs, and other secrets.
+          required: true

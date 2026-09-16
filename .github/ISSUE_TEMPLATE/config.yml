@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/Xjle6ywek272819/OlClash/security/advisories/new
+    about: Report vulnerabilities privately; do not open a public issue.
