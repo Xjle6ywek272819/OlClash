@@ -174,8 +174,11 @@ subprojects {
 
         buildTypes {
             named("release") {
-                isMinifyEnabled = isApp
-                isShrinkResources = isApp
+                // Keep the first public alpha behaviorally identical to the tested debug build.
+                // gomobile/JNI entry points are invisible to R8 static analysis; shrinking already
+                // removed the olcRTC callback bridge once. Re-enable only with release smoke tests.
+                isMinifyEnabled = false
+                isShrinkResources = false
                 signingConfig = signingConfigs.findByName("release") ?: signingConfigs["debug"]
                 proguardFiles(
                     getDefaultProguardFile("proguard-android-optimize.txt"),
