@@ -114,8 +114,26 @@ jobs:
             exit 1
           fi
 
-          output="release-artifacts/OlcLash-v1.1.0-alpha.1-arm64-v8a.apk"
+          output="release-artifacts/OlcLash-v1.1.0-alpha.2-arm64-v8a.apk"
           cp "${apks[0]}" "$output"
+
+          if ! unzip -l "$output" | grep -q 'lib/arm64-v8a/libgojni.so'; then
+            echo "::error::olcRTC native runtime is missing from the release APK"
+            exit 1
+          fi
+
+          dex_symbols="$(unzip -p "$output" 'classes*.dex' | strings)"
+          for required_symbol in \
+            'Lmobile/LogWriter;' \
+            'Lmobile/SocketProtector;' \
+            'Lmobile/Mobile$proxyLogWriter;' \
+            'Lmobile/Mobile$proxySocketProtector;'
+          do
+            if ! grep -Fq "$required_symbol" <<<"$dex_symbols"; then
+              echo "::error::R8 removed required gomobile symbol: $required_symbol"
+              exit 1
+            fi
+          done
 
           apksigner_path="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -n "$apksigner_path"
@@ -129,7 +147,7 @@ jobs:
       - name: Upload signed release artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: OlcLash-v1.1.0-alpha.1-arm64-v8a
+          name: OlcLash-v1.1.0-alpha.2-arm64-v8a
           path: release-artifacts/*
           if-no-files-found: error
           retention-days: 30

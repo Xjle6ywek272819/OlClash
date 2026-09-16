@@ -61,3 +61,12 @@
 # SnakeYAML references Java Beans APIs that are not available on Android.
 # These classes are never used at runtime in our app paths, so suppress warnings for shrinker.
 -dontwarn java.beans.**
+
+# gomobile-generated Java types are called from libgojni through JNI. R8 cannot see
+# those native references and otherwise removes callback interfaces/proxy classes,
+# leaving olcRTC present in the APK but unable to start in release builds.
+-keep class go.** { *; }
+-keep class mobile.** { *; }
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
